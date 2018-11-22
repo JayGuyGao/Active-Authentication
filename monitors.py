@@ -76,12 +76,54 @@ class NetworkMonitor(Monitor):
         logs = self.get_logs(self.previous_connections, self.current_connections)
         self.log(logs)
 
+    def get_logs(self, previous_connections, current_connections):
+        logs = []
+        for key in previous_connections:
+            if key not in current_connections:
+                logs.append(self.gen_log(previous_connections[key], 'terminate'))
+
+        for key in current_connections:
+            if key not in previous_connections:
+                logs.append(self.gen_log(current_connections[key], 'create'))
+            elif current_connections[key]['status'] != previous_connections[key]['status']:
+                logs.append(self.gen_log(current_connections[key], 'change_status'))
+
+        return logs
+
+    def gen_log(self, connection, action):
+        return LogEntry(
+            timestamp=self.timestamp,
+            category='network',
+            action=action,
+            detail='{},{},{},{}'.format(
+                connection['laddr'],
+                connection['raddr'],
+                connection['pid'],
+                connection['status']
+            )
+        )
+
     def get_current_connections(self):
-        pass
+        current_connections = {}
+        for conn in psutil.net_connections("tcp"):
+            #print(conn)
+            key = "{}:{}".format(
+                conn.laddr.ip,
+                conn.laddr.port,
+            )
+            current_connections[key] = {
+                "laddr": conn.laddr,
+                "raddr": conn.raddr,
+                "status": conn.status,
+                "pid": conn.pid
+            }
+        return current_connections
 
 
 if __name__ == '__main__':
     process_monitor = ProcessMonitor()
+    network_monitor = NetworkMonitor()
     while True:
         process_monitor.run()
+        network_monitor.run()
         time.sleep(1)
