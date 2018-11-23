@@ -3,15 +3,15 @@ import time
 from collections import namedtuple
 
 
-LogEntry = namedtuple('LogEntry', ['timestamp', 'category', 'action', 'detail'], verbose=False)
+LogEntry = namedtuple('LogEntry', ['timestamp', 'category', 'action', 'detail'])
 
 
 class Monitor:
     def __init__(self):
         pass
 
-    def run(self):
-        raise NotImplementedError("run not implemented")
+    def update(self):
+        raise NotImplementedError("update not implemented")
 
     def log(self, logs):
         for log_entry in logs:
@@ -28,7 +28,7 @@ class ProcessMonitor(Monitor):
         self.previous_processes = {}
         self.current_processes = self.get_current_processes()
 
-    def run(self):
+    def update(self):
         self.timestamp = time.time()
         self.previous_processes = self.current_processes
         self.current_processes = self.get_current_processes()
@@ -69,7 +69,7 @@ class NetworkMonitor(Monitor):
         self.previous_connections = {}
         self.current_connections = self.get_current_connections()
 
-    def run(self):
+    def update(self):
         self.timestamp = time.time()
         self.previous_connections = self.current_connections
         self.current_connections = self.get_current_connections()
@@ -124,6 +124,6 @@ if __name__ == '__main__':
     process_monitor = ProcessMonitor()
     network_monitor = NetworkMonitor()
     while True:
-        process_monitor.run()
-        network_monitor.run()
+        process_monitor.update()
+        network_monitor.update()
         time.sleep(1)
