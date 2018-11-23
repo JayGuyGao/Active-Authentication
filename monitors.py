@@ -1,30 +1,39 @@
 import psutil
 import time
 from collections import namedtuple
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+from watchdog.events import EVENT_TYPE_MODIFIED, EVENT_TYPE_MOVED, EVENT_TYPE_CREATED, EVENT_TYPE_DELETED
 
 
 LogEntry = namedtuple('LogEntry', ['timestamp', 'category', 'action', 'detail'])
 
 
 class Monitor:
-    def __init__(self):
-        pass
+    def __init__(self, verbose=True, log_path="monitor.log"):
+        self.verbose = verbose
+        self.log_path = log_path
 
     def update(self):
         raise NotImplementedError("update not implemented")
 
     def log(self, logs):
         for log_entry in logs:
-            print("{}; {}; {}; {}".format(
+            log_str = "{};{};{};{}".format(
                 log_entry.timestamp,
                 log_entry.category,
                 log_entry.action,
                 log_entry.detail
-            ))
+            )
+            if self.verbose:
+                print(log_str)
+            with open(self.log_path, "a") as log_file:
+                log_file.write(log_str + "\n")
 
 
 class ProcessMonitor(Monitor):
-    def __init__(self):
+    def __init__(self, verbose=True, log_path="monitor.log"):
+        super(ProcessMonitor, self).__init__(verbose, log_path)
         self.previous_processes = {}
         self.current_processes = self.get_current_processes()
 
@@ -65,7 +74,8 @@ class ProcessMonitor(Monitor):
 
 
 class NetworkMonitor(Monitor):
-    def __init__(self):
+    def __init__(self, verbose=True, log_path="monitor.log"):
+        super(NetworkMonitor, self).__init__(verbose, log_path)
         self.previous_connections = {}
         self.current_connections = self.get_current_connections()
 
@@ -120,10 +130,58 @@ class NetworkMonitor(Monitor):
         return current_connections
 
 
+class CallbackEventHandler(FileSystemEventHandler):
+    def __init__(self, callback):
+        super(CallbackEventHandler, self).__init__()
+        self.callback = callback
+
+    def on_any_event(self, event):
+        super(CallbackEventHandler, self).on_any_event(event)
+        self.callback(event)
+
+
+
+class FileMonitor(Monitor):
+    def __init__(self, path, verbose=True, log_path="monitor.log"):
+        super(FileMonitor, self).__init__(verbose, log_path)
+        event_handler = CallbackEventHandler(self.handle_event)
+        self.observer = Observer()
+        self.observer.schedule(event_handler, path, recursive=True)
+        self.observer.start()
+
+    def handle_event(self, event):
+        #what = 'directory' if event.is_directory else 'file'
+        if event.event_type is EVENT_TYPE_MODIFIED and event.src_path.find(self.log_path) != -1:
+            return
+
+        _log_detail_map = {
+            EVENT_TYPE_MODIFIED: lambda evt: "{}".format(evt.src_path),
+            EVENT_TYPE_MOVED: lambda evt: "{} to {}".format(evt.src_path, evt.dest_path),
+            EVENT_TYPE_CREATED: lambda evt: "{}".format(evt.src_path),
+            EVENT_TYPE_DELETED: lambda evt: "{}".format(evt.src_path),
+        }
+        log_entry = LogEntry(
+            timestamp=time.time(),
+            category="file",
+            action=event.event_type,
+            detail=_log_detail_map[event.event_type](event)
+        )
+        self.log([log_entry])
+
+    def update(self):
+        pass
+
+    def __del__(self):
+        pass
+        #self.observer.stop()
+        #self.observer.join()
+
 if __name__ == '__main__':
     process_monitor = ProcessMonitor()
     network_monitor = NetworkMonitor()
+    file_monitor = FileMonitor(path="/Users/JayGuy")
     while True:
         process_monitor.update()
         network_monitor.update()
+        file_monitor.update()
         time.sleep(1)
