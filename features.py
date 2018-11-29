@@ -88,17 +88,11 @@ def str2logentry(string):
     )
 
 
-def extract_features_from_file(file_path="monitor.log"):
+def extract_features_from_file(file_path="monitor.log" ,features):
     with open(file_path, "r") as f:
         log_entries = [str2logentry(line.strip()) for line in f.readlines()]
     feature_extractor = FeatureExtractor(
-        features=[
-            NumberOfProcessesTerminated(),
-            NumberOfProcessesCreated(),
-            NumberOfFileChanges(),
-            NumberOfConnectionsOpened(),
-            NumberOfConnectionsClosed()
-        ],
+        features=features,
         window_size=300
     )
     return feature_extractor.extract(log_entries)
