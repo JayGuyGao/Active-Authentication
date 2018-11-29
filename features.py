@@ -58,19 +58,20 @@ class FeatureExtractor:
     def __init__(self, features, window_size=300):
         self.features = features
         self.window_size = window_size
+        self.window = []
 
     def extract(self, log_entries):
         if log_entries == []:
             return []
 
-        window = []
+        #self.window = []
         results = []
         for i in range(len(log_entries)):
             log = log_entries[i]
-            while window != [] and log.timestamp - window[0].timestamp > self.window_size:
-                results.append(self.compute_feature(window))
-                window = window[1:]
-            window.append(log)
+            while self.window != [] and log.timestamp - self.window[0].timestamp > self.window_size:
+                results.append(self.compute_feature(self.window))
+                self.window = self.window[1:]
+            self.window.append(log)
         return np.array(results)
 
     def compute_feature(self, window):
