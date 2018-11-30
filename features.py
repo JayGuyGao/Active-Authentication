@@ -59,6 +59,7 @@ class FeatureExtractor:
         self.features = features
         self.window_size = window_size
         self.window = []
+        self.results = None
 
     def extract(self, log_entries):
         if log_entries == []:
@@ -66,13 +67,24 @@ class FeatureExtractor:
 
         #self.window = []
         results = []
-        for i in range(len(log_entries)):
-            log = log_entries[i]
-            while self.window != [] and log.timestamp - self.window[0].timestamp > self.window_size:
-                results.append(self.compute_feature(self.window))
+        i = 0
+        n = len(log_entries)
+        while i < n:
+            while self.window != [] and log_entries[i].timestamp - self.window[0].timestamp > self.window_size:
                 self.window = self.window[1:]
-            self.window.append(log)
+            while i < n and (self.window == [] or log_entries[i].timestamp - self.window[0].timestamp <= self.window_size):
+                self.window.append(log_entries[i])
+                i += 1
+            results.append(self.compute_feature(self.window))
+
+        if self.results is None:
+            self.results = np.array(results)
+        else:
+            self.results = np.concatenate((self.results, results))
         return np.array(results)
+
+    def clear_results(self):
+        self.results = None
 
     def compute_feature(self, window):
         return [np.log(feat.extract(window) + 1) for feat in self.features]
@@ -88,7 +100,7 @@ def str2logentry(string):
     )
 
 
-def extract_features_from_file(file_path="monitor.log" ,features):
+def extract_features_from_file(file_path, features):
     with open(file_path, "r") as f:
         log_entries = [str2logentry(line.strip()) for line in f.readlines()]
     feature_extractor = FeatureExtractor(
