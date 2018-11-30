@@ -10,14 +10,17 @@ LogEntry = namedtuple('LogEntry', ['timestamp', 'category', 'action', 'detail'])
 
 
 class Monitor:
-    def __init__(self, verbose=True, log_path="monitor.log"):
+    def __init__(self, verbose=True, log_path="monitor.log", callback=None):
         self.verbose = verbose
         self.log_path = log_path
+        self.callback = callback
 
     def update(self):
         raise NotImplementedError("update not implemented")
 
     def log(self, logs):
+        if self.callback:
+            self.callback(logs)
         for log_entry in logs:
             log_str = "{};{};{};{}".format(
                 log_entry.timestamp,
@@ -32,8 +35,9 @@ class Monitor:
 
 
 class ProcessMonitor(Monitor):
-    def __init__(self, verbose=True, log_path="monitor.log"):
-        super(ProcessMonitor, self).__init__(verbose, log_path)
+    def __init__(self, verbose=True, log_path="monitor.log", callback=None):
+        super(ProcessMonitor, self).__init__(verbose, log_path, callback)
+        self.timestamp = time.time()
         self.previous_processes = {}
         self.current_processes = self.get_current_processes()
 
@@ -41,6 +45,9 @@ class ProcessMonitor(Monitor):
         self.timestamp = time.time()
         self.previous_processes = self.current_processes
         self.current_processes = self.get_current_processes()
+        for i in self.previous_processes:
+            if i in self.current_processes:
+                self.current_processes[i]['timestamp'] = self.previous_processes[i]['timestamp']
         logs = self.get_logs(self.previous_processes, self.current_processes)
         self.log(logs)
 
@@ -63,19 +70,27 @@ class ProcessMonitor(Monitor):
             timestamp=self.timestamp,
             category='process',
             action=action,
-            detail='{},{},{},{}'.format(process['pid'], process['ppid'], process['exe'], process['status'])
+            detail='{},{},{},{},{}'.format(
+                process['pid'],
+                process['ppid'],
+                process['exe'],
+                process['status'],
+                self.timestamp - process['timestamp']
+            )
         )
 
     def get_current_processes(self):
         current_processes = {}
         for proc in psutil.process_iter(attrs=['pid', 'ppid', 'exe', 'status']):
             current_processes[proc.info['pid']] = proc.info
+            current_processes[proc.info['pid']]['timestamp'] = self.timestamp
         return current_processes
 
 
 class NetworkMonitor(Monitor):
-    def __init__(self, verbose=True, log_path="monitor.log"):
-        super(NetworkMonitor, self).__init__(verbose, log_path)
+    def __init__(self, verbose=True, log_path="monitor.log", callback=None):
+        super(NetworkMonitor, self).__init__(verbose, log_path, callback)
+        self.timestamp = time.time()
         self.previous_connections = {}
         self.current_connections = self.get_current_connections()
 
@@ -83,6 +98,9 @@ class NetworkMonitor(Monitor):
         self.timestamp = time.time()
         self.previous_connections = self.current_connections
         self.current_connections = self.get_current_connections()
+        for i in self.previous_connections:
+            if i in self.current_connections:
+                self.current_connections[i]['timestamp'] = self.previous_connections[i]['timestamp']
         logs = self.get_logs(self.previous_connections, self.current_connections)
         self.log(logs)
 
@@ -105,11 +123,12 @@ class NetworkMonitor(Monitor):
             timestamp=self.timestamp,
             category='network',
             action=action,
-            detail='{},{},{},{}'.format(
+            detail='{},{},{},{},{}'.format(
                 connection['laddr'],
                 connection['raddr'],
                 connection['pid'],
-                connection['status']
+                connection['status'],
+                self.timestamp - connection['timestamp']
             )
         )
 
@@ -125,7 +144,8 @@ class NetworkMonitor(Monitor):
                 "laddr": conn.laddr,
                 "raddr": conn.raddr,
                 "status": conn.status,
-                "pid": conn.pid
+                "pid": conn.pid,
+                "timestamp": self.timestamp,
             }
         return current_connections
 
@@ -142,8 +162,8 @@ class CallbackEventHandler(FileSystemEventHandler):
 
 
 class FileMonitor(Monitor):
-    def __init__(self, path, verbose=True, log_path="monitor.log"):
-        super(FileMonitor, self).__init__(verbose, log_path)
+    def __init__(self, path, verbose=True, log_path="monitor.log", callback=None):
+        super(FileMonitor, self).__init__(verbose, log_path, callback)
         event_handler = CallbackEventHandler(self.handle_event)
         self.observer = Observer()
         self.observer.schedule(event_handler, path, recursive=True)
@@ -177,9 +197,11 @@ class FileMonitor(Monitor):
         #self.observer.join()
 
 if __name__ == '__main__':
+    print("Initializing...")
     process_monitor = ProcessMonitor()
     network_monitor = NetworkMonitor()
-    file_monitor = FileMonitor(path="/Users/JayGuy")
+    file_monitor = FileMonitor(path="/Users/JayGuy/Documents")
+    print("Monitoring...")
     while True:
         process_monitor.update()
         network_monitor.update()
