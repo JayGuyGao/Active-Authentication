@@ -18,6 +18,7 @@ features = [
 
 n_components = 5
 covariance_type = 'full'
+window_size = 300
 
 threshold = -10
 
