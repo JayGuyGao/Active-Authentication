@@ -75,6 +75,7 @@ class FeatureExtractor:
             while i < n and (self.window == [] or log_entries[i].timestamp - self.window[0].timestamp <= self.window_size):
                 self.window.append(log_entries[i])
                 i += 1
+            print((self.window[-1].timestamp - self.window[0].timestamp) / 60)
             results.append(self.compute_feature(self.window))
 
         if self.results is None:
