@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
     feature_extractor = FeatureExtractor(
         features=constants.features,
-        window_size=300
+        window_size=constants.window_size
     )
 
     print("Initializing...")

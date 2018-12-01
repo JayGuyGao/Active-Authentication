@@ -8,6 +8,7 @@ import pickle
 
 if __name__ == "__main__":
     X_train = extract_features_from_file(constants.log_path, constants.features)
+    X_test = extract_features_from_file("yiyang.log", constants.features)
     print(X_train.shape)
 
     clf = mixture.GaussianMixture(
@@ -19,7 +20,7 @@ if __name__ == "__main__":
         pickle.dump(clf, f)
     print(clf.score(X_train))
     print(clf.score_samples(X_train))
-    x = clf.score_samples(X_train)
+    x = clf.score_samples(X_test)
     print(x.reshape(-1, 1).shape)
 
     plt.hist(x, bins='auto')
